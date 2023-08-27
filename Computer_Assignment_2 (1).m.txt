@@ -1,0 +1,146 @@
+Ca0 = [2 5 6 6 11 14 16 24];
+Ca = [0.5 3 1 2 6 10 8 4];
+T_res = [30 1 50 8 4 20 20 4];
+rA_inv = T_res./(Ca0 - Ca);
+xQ = 0.05:0.01:10;
+yQ = spline(Ca,rA_inv,xQ);
+pp = spline(Ca,rA_inv);
+
+
+Ca_in = input('Enter the inlet concentration:');
+Ca_out = input('Enter the exit concentration:');
+v0 = input('Enter the flow rate:');
+disp('(1) To find minimum volume for PFR ');
+disp('(2) To find minimum volume for MFR ');
+disp('(3) To find minimum volume for 2 MFRs ');
+disp('(4) To find minimum volume for MFR followed by PFR ');
+disp('(5) To find minimum volume for PFR with recycle');
+n = input('Enter the part to solvev (eg write 1 for part(1))');
+
+%Ca_out = 1;
+%Ca_in = 10;
+%v0 = 0.1;
+
+%for a single PFR
+if n == 1
+    int_values = Ca_out:0.1:Ca_in;
+    rA_int_values = spline(Ca,rA_inv,int_values);
+    AUC = trapz(int_values, rA_int_values);
+    V_min = v0*AUC;
+    X = int_values;
+    Y = rA_int_values;
+    area(X,Y);
+    disp(['The volume of PFR required is (in Litres): ', num2str(V_min)]);
+    hold on;
+    %area(xQ,yQ);
+    hold on;
+    plot(xQ, yQ,'k', 'LineWidth', 2);
+    hold on;
+    plot(Ca,rA_inv,'ko','LineWidth',2,'MarkerSize',4);
+    xlabel('Ca')
+    ylabel('-1/rA')
+    title('Autocatalytic Reaction')
+    grid on
+end
+
+
+%for a single CSTR
+if n == 2
+        rA_f = spline(Ca,rA_inv,Ca_out);
+        V_min_CSTR = (Ca_in - Ca_out)*rA_f*v0;
+        disp(['The volume of CSTR required is (in Litres): ', num2str(V_min_CSTR)]);
+        X = [Ca_in, Ca_out];
+        Y = [rA_f, rA_f];
+        area(X,Y);
+        hold on;
+        plot(xQ, yQ,'k', 'LineWidth', 2);
+        hold on;
+        plot(Ca,rA_inv,'ko','LineWidth',2,'MarkerSize',4);
+        xlabel('Ca')
+        ylabel('-1/rA')
+        title('Autocatalytic Reaction')
+        grid on
+        
+end
+
+
+
+%for two CSTRs
+if n == 3
+        rA_in = spline(Ca,rA_inv,Ca_in);
+        rA_out = spline(Ca,rA_inv,Ca_out);
+%minimization of rectangles
+        Area = @(C) (Ca_in - C).*(spline(Ca,rA_inv,C)) + (C-Ca_out).*((spline(Ca,rA_inv,Ca_out)));
+        [min_area, Ca_int] = min(Area(xQ));
+        V1 = (Ca_in - xQ(Ca_int))*(spline(Ca,rA_inv,xQ(Ca_int)))*v0;
+        V2 = (xQ(Ca_int)-Ca_out)*(spline(Ca,rA_inv,Ca_out))*v0;
+        Vtot = min_area*v0;
+        disp(['The total minimum value in case of two CSTRs is ', num2str(Vtot)]);
+        disp(['The volume of CSTR1 is: ', num2str(V1)]);
+        disp(['The volume of CSTR2 is: ', num2str(V2)]);
+        X = [Ca_in, xQ(Ca_int)];
+        Y = [spline(Ca,rA_inv,xQ(Ca_int)) , spline(Ca,rA_inv,xQ(Ca_int))]
+        area(X,Y);
+        X1 = [xQ(Ca_int),Ca_out];
+        Y1 = [rA_out, rA_out];
+        hold on;
+        area(X1,Y1);
+        hold on;
+        plot(xQ, yQ,'k', 'LineWidth', 2);
+        hold on;
+        plot(Ca,rA_inv,'ko','LineWidth',2,'MarkerSize',4);
+        xlabel('Ca')
+        ylabel('-1/rA')
+        title('Autocatalytic Reaction')
+        grid on
+
+        
+end
+
+if n == 4
+        %combination of PFR and CSTR
+        f = @(x) spline(Ca,rA_inv,x) ;
+        [min_area2, Ca_int2] = min(f(xQ));
+        V_1 = (Ca_in - xQ(Ca_int2))*(spline(Ca,rA_inv,xQ(Ca_int2)))*v0;
+        x_values = Ca_out:0.01:xQ(Ca_int2);
+        rA_x_values = spline(Ca,rA_inv,x_values);
+        V_2 = trapz(x_values, rA_x_values)*v0;
+        V_tot = V_1 + V_2;
+        disp(['The total minimum value in case MFR followed by PFR ', num2str(V_tot)]);
+        disp(['The volume of MFR is: ', num2str(V_1)]);
+        disp(['The volume of PFR is: ', num2str(V_2)]);
+        X1 = [Ca_in; xQ(Ca_int2)];
+        Y1 = [yQ(Ca_int2),yQ(Ca_int2) ];
+        hold on;
+        area(X1,Y1);        
+        hold on;
+        area(x_values,rA_x_values);
+        hold on;
+        plot(xQ, yQ,'k', 'LineWidth', 2);
+        hold on;
+        plot(Ca,rA_inv,'ko','LineWidth',2,'MarkerSize',4);
+        xlabel('Ca')
+        ylabel('-1/rA')
+        title('Autocatalytic Reaction')
+        grid on
+end
+
+
+if n == 5
+        %PFR with recycle
+        C1 =fsolve(@(C1) (C1 - Ca_out).*ppval(pp,C1) - trapz((Ca_out: 0.01:C1),ppval(pp,(Ca_out: 0.01:C1))), 6);
+        V_rec = (Ca_in - Ca_out)*ppval(pp,C1)*v0;
+        disp(['The minimum volume of PFR with recycle is: ', num2str(V_rec)]);
+        X = [Ca_out, Ca_in];
+        Y = [ppval(pp,C1), ppval(pp,C1) ];
+        hold on;
+        area(X,Y);        
+        hold on;
+        plot(xQ, yQ,'k', 'LineWidth', 2);
+        hold on;
+        plot(Ca,rA_inv,'ko','LineWidth',2,'MarkerSize',4);
+        xlabel('Ca')
+        ylabel('-1/rA')
+        title('Autocatalytic Reaction')
+        grid on
+end
